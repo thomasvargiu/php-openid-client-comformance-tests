@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TMV\OpenIdClient\ConformanceTest\RpTest\ResponseTypeAndResponseMode;
+
+use PHPUnit\Framework\Assert;
+use TMV\OpenIdClient\ConformanceTest\RpTest\AbstractRpTest;
+use TMV\OpenIdClient\ConformanceTest\TestInfo;
+use TMV\OpenIdClient\Model\AuthSession;
+use TMV\OpenIdClient\Service\AuthorizationService;
+
+/**
+ * Make an authentication request using the Hybrid Flow, specifying the response_type as 'code id_token token'.
+ *
+ * An authentication response containing an authorization code, an ID Token and an Access Token.
+ */
+class RPResponseTypeCodeIdTokenTokenTest extends AbstractRpTest
+{
+    public function getTestId(): string
+    {
+        return 'rp-response_type-code+id_token+token';
+    }
+
+    public function execute(TestInfo $testInfo): void
+    {
+        $client = $this->registerClient($testInfo);
+
+        Assert::assertSame('code id_token token', $testInfo->getResponseType());
+
+        // Get authorization redirect uri
+        $authorizationService = $this->getContainer()->get(AuthorizationService::class);
+
+        $authSession = AuthSession::fromArray([
+            'nonce' => \bin2hex(\random_bytes(32)),
+        ]);
+        $uri = $authorizationService->getAuthorizationUri($client, [
+            'response_type' => $testInfo->getResponseType(),
+            'nonce' => $authSession->getNonce(),
+        ]);
+
+        // Simulate a redirect and create the server request
+        $serverRequest = $this->simulateAuthRedirect($uri);
+
+        $params = $authorizationService->getCallbackParams($serverRequest, $client);
+
+        Assert::assertArrayHasKey('code', $params);
+        Assert::assertArrayHasKey('id_token', $params);
+        Assert::assertArrayHasKey('access_token', $params);
+    }
+}
